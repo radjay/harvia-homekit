@@ -17,7 +17,29 @@ This project provides a standalone Python service that integrates with Apple Hom
 - Apple HomeKit compatible device (iPhone, iPad, or Mac)
 - Debian/Ubuntu-based system for service installation (optional)
 
-## Installation
+## Quick Setup
+
+For the easiest setup experience, use the quick setup script:
+
+```bash
+# Install git if you don't have it already
+# For Debian/Ubuntu:
+# sudo apt-get install git
+
+# Download and run the setup script
+curl -s https://raw.githubusercontent.com/yourusername/harvia-homekit/main/quick_setup.sh | bash
+```
+
+This interactive script will:
+
+1. Clone the repository
+2. Set up a Python virtual environment
+3. Configure your credentials
+4. Offer to run the service immediately
+
+## Manual Installation
+
+If you prefer to install manually, follow these steps:
 
 ### 1. Clone the repository
 
