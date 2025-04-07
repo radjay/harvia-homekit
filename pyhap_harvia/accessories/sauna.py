@@ -69,14 +69,14 @@ class HarviaSaunaAccessory(Accessory):
         self.current_mode_char = thermostat_service.configure_char(
             'CurrentHeatingCoolingState',
             value=1 if self.device.active else 0,  # 0=off, 1=heat
-            properties={'validValues': [0, 1]}  # Only allow Off and Heat states
+            properties={'validValues': [0, 1], 'minValue': 0, 'maxValue': 1}  # Only allow Off and Heat states
         )
         
         # Target Heating/Cooling state - only allow Off and Heat
         self.target_mode_char = thermostat_service.configure_char(
             'TargetHeatingCoolingState',
             value=1 if self.device.active else 0,  # 0=off, 1=heat
-            properties={'validValues': [0, 1]}  # Only allow Off and Heat states
+            properties={'validValues': [0, 1], 'minValue': 0, 'maxValue': 1}  # Only allow Off and Heat states
         )
         
         # Explicitly set the callback
