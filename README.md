@@ -69,9 +69,13 @@ nano ~/.config/harvia-homekit/config.json
   "username": "your_harvia_username",
   "password": "your_harvia_password",
   "pin_code": "031-45-154",
-  "service_name": "Harvia Sauna"
+  "service_name": "Harvia Sauna",
+  "device_id": "",
+  "device_name": "My Sauna"
 }
 ```
+
+**Note**: The `device_id` field is used when the service cannot automatically discover your sauna through the API. See the [Finding Your Device ID](#finding-your-device-id) section below.
 
 ### 4. Run the service manually
 
@@ -148,6 +152,50 @@ sudo systemctl enable harvia-homekit
 sudo systemctl start harvia-homekit
 ```
 
+## Finding Your Device ID
+
+If the service fails to automatically discover your sauna, you'll need to manually specify the device ID in your configuration file. Here are several ways to find your device ID:
+
+### Method 1: Using the Harvia mobile app
+
+1. Install and login to the official Harvia mobile app
+2. Navigate to your sauna in the app
+3. Look for device information in the settings or about section
+4. The device ID may be displayed as a serial number or device identifier
+
+### Method 2: Using the debug mode
+
+The debug mode can help you see what's happening with the API:
+
+1. Ensure your virtual environment is activated
+2. Run the service with debug logging enabled:
+   ```bash
+   python main.py --debug
+   ```
+3. Look for errors or device discovery attempts in the logs
+4. Check if any partial device information is displayed
+
+### Method 3: Using Network Inspection
+
+If you have access to a network monitoring tool or can capture the traffic from the official Harvia app:
+
+1. Use a tool like Wireshark or a proxy like Charles to inspect the network traffic
+2. Look for GraphQL requests to the Harvia cloud API
+3. Find requests containing device information and extract the device ID
+
+Once you have found your device ID, add it to your config.json file:
+
+```json
+{
+  "username": "your_harvia_username",
+  "password": "your_harvia_password",
+  "pin_code": "031-45-154",
+  "service_name": "Harvia Sauna",
+  "device_id": "your-device-id-here",
+  "device_name": "My Sauna"
+}
+```
+
 ## Adding to Apple Home
 
 1. Open the Home app on your iOS device
@@ -170,14 +218,42 @@ After adding to Apple Home, you'll see the following accessories:
 
 ## Troubleshooting
 
-Check the service status and logs:
+### Common Issues
+
+#### Cannot Find Devices
+
+If you see an error like `No sauna devices found` or `Field 'listDevices' in type 'Query' is undefined`:
+
+1. The Harvia API structure has changed or your account doesn't have the correct permissions
+2. Add your device ID manually to the configuration file (see [Finding Your Device ID](#finding-your-device-id))
+3. Check your internet connection and firewall settings
+
+#### Authentication Failures
+
+If you see errors about authentication:
+
+1. Verify your username and password are correct
+2. Ensure you're using the same credentials as the official Harvia app
+3. Check if your account has been locked due to too many failed attempts
+
+#### Connection Issues
+
+If the service starts but doesn't respond to commands:
+
+1. Make sure your sauna is connected to your home Wi-Fi
+2. Verify the sauna is registered to your Harvia account
+3. Check if the sauna can be controlled via the official Harvia app
+
+### Checking Logs
+
+For service logs:
 
 ```bash
 sudo systemctl status harvia-homekit
 sudo journalctl -u harvia-homekit -f
 ```
 
-For more detailed logging, run with the debug flag:
+For detailed logging, run with the debug flag:
 
 ```bash
 # If running manually with virtual environment:

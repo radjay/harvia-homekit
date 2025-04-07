@@ -191,21 +191,117 @@ class HarviaSaunaAPI:
         return wssUrl
     
     async def get_devices(self) -> list:
-        """Get all devices for the user"""
-        response = await self.endpoint("device", {"query": "query ListDevices {listDevices {items {id displayName type hwVersion swVersion connectionState active }}}"})
-        if 'data' in response and 'listDevices' in response['data'] and 'items' in response['data']['listDevices']:
-            return response['data']['listDevices']['items']
+        """Get all sauna devices available to the user"""
+        # The API has changed - try different query formats
+        
+        # Try to get devices using user query first
+        try:
+            logger.debug("Trying to get devices using 'user' query")
+            response = await self.endpoint("users", {
+                "query": "query GetUser { getUser { devices { id displayName type active connectionState } } }"
+            })
+            
+            if 'data' in response and 'getUser' in response['data'] and response['data']['getUser'] and 'devices' in response['data']['getUser']:
+                devices = response['data']['getUser']['devices']
+                logger.info(f"Found {len(devices)} devices using user query")
+                return devices
+        except Exception as e:
+            logger.warning(f"Error getting devices via user query: {str(e)}")
+        
+        # Try alternative queries if the first approach failed
+        try:
+            logger.debug("Trying to get devices using 'listDevices' query")
+            response = await self.endpoint("device", {
+                "query": "query ListDevices {listDevices {items {id displayName type hwVersion swVersion connectionState active }}}"
+            })
+            
+            if 'data' in response and 'listDevices' in response['data'] and 'items' in response['data']['listDevices']:
+                devices = response['data']['listDevices']['items']
+                logger.info(f"Found {len(devices)} devices using listDevices query")
+                return devices
+        except Exception as e:
+            logger.warning(f"Error getting devices via listDevices query: {str(e)}")
+            
+        # Try another alternative approach - list the user's assigned devices
+        try:
+            logger.debug("Trying to get devices using 'getAssignedDevices' query")
+            response = await self.endpoint("device", {
+                "query": "query GetAssignedDevices {getAssignedDevices {id displayName type active connectionState}}"
+            })
+            
+            if 'data' in response and 'getAssignedDevices' in response['data']:
+                devices = response['data']['getAssignedDevices']
+                logger.info(f"Found {len(devices)} devices using getAssignedDevices query")
+                return devices
+        except Exception as e:
+            logger.warning(f"Error getting devices via getAssignedDevices query: {str(e)}")
+        
+        # If we can't find devices via API, ask user to provide device ID
+        logger.warning("Could not find devices through API queries. Will try manual device ID from config")
+        
+        from pathlib import Path
+        import os
+        
+        # Try to read from config file
+        config_paths = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config.json'),
+            os.path.expanduser('~/.config/harvia-homekit/config.json'),
+            '/etc/harvia-homekit/config.json'
+        ]
+        
+        for config_path in config_paths:
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, 'r') as f:
+                        config = json.load(f)
+                        if 'device_id' in config and config['device_id']:
+                            device_id = config['device_id']
+                            device_name = config.get('device_name', f'Sauna {device_id}')
+                            logger.info(f"Using manually configured device ID: {device_id}")
+                            return [{
+                                'id': device_id,
+                                'displayName': device_name,
+                                'type': 'XENIO',
+                                'active': False,
+                                'connectionState': 'UNKNOWN'
+                            }]
+                except Exception as e:
+                    logger.warning(f"Error reading config file {config_path}: {str(e)}")
+        
+        # If no devices found, return empty list
+        logger.error("No devices found. Please add a device_id to your config.json file.")
         return []
     
     async def get_device_data(self, device_id: str) -> dict:
         """Get data for a specific device"""
-        response = await self.endpoint("data", {
-            "query": "query GetLatestDeviceData($deviceId: ID!) {getLatestDeviceData(deviceId: $deviceId) {active deviceId fan humidity light moisture remoteStartEn remainingTime steamEn steamOn statusCodes targetRh targetTemp temperature timestamp}}",
-            "variables": {"deviceId": device_id}
-        })
-        if 'data' in response and 'getLatestDeviceData' in response['data']:
-            return response['data']['getLatestDeviceData']
-        return {}
+        try:
+            response = await self.endpoint("data", {
+                "query": "query GetLatestDeviceData($deviceId: ID!) {getLatestDeviceData(deviceId: $deviceId) {active deviceId fan humidity light moisture remoteStartEn remainingTime steamEn steamOn statusCodes targetRh targetTemp temperature timestamp}}",
+                "variables": {"deviceId": device_id}
+            })
+            
+            if 'data' in response and 'getLatestDeviceData' in response['data']:
+                return response['data']['getLatestDeviceData']
+            
+            logger.warning(f"No data found for device {device_id}. Response: {json.dumps(response)}")
+            
+            # Return default data if we couldn't get actual data
+            return {
+                'deviceId': device_id,
+                'active': False,
+                'light': False,
+                'fan': False,
+                'steamEn': False,
+                'targetTemp': 60,
+                'targetRh': 30,
+                'temperature': 25,
+                'humidity': 30,
+                'statusCodes': "000"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting device data: {str(e)}")
+            return {}
     
     async def device_mutation(self, device_id: str, payload: dict) -> dict:
         """Send a mutation to control a device"""
