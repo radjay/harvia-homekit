@@ -31,6 +31,16 @@ cp -r ./* ${INSTALL_PATH}/
 echo "Configuring service file with user: ${CURRENT_USER}"
 sed -i "s/YOUR_USERNAME/${CURRENT_USER}/g" ${INSTALL_PATH}/harvia-homekit.service
 
+# Set up virtual environment
+echo "Setting up Python virtual environment..."
+python3 -m venv ${INSTALL_PATH}/venv
+${INSTALL_PATH}/venv/bin/pip install --upgrade pip
+${INSTALL_PATH}/venv/bin/pip install -r ${INSTALL_PATH}/requirements.txt
+
+# Update service file to use virtual environment
+echo "Updating service file to use virtual environment..."
+sed -i "s|ExecStart=/usr/bin/python3 /opt/harvia-homekit/main.py|ExecStart=${INSTALL_PATH}/venv/bin/python ${INSTALL_PATH}/main.py|g" ${INSTALL_PATH}/harvia-homekit.service
+
 # Copy service file
 echo "Installing systemd service..."
 cp ${INSTALL_PATH}/harvia-homekit.service ${SYSTEMD_PATH}/
@@ -41,10 +51,6 @@ if [ ! -f "${CONFIG_PATH}/config.json" ]; then
   cp ${INSTALL_PATH}/config.json ${CONFIG_PATH}/
   echo "Please edit ${CONFIG_PATH}/config.json with your credentials."
 fi
-
-# Install Python dependencies
-echo "Installing Python dependencies..."
-pip3 install -r ${INSTALL_PATH}/requirements.txt
 
 # Set permissions
 echo "Setting permissions..."
