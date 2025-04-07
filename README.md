@@ -42,7 +42,7 @@ Follow these steps to install the service:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/harvia-homekit.git
+git clone https://github.com/radjay/harvia-homekit.git
 cd harvia-homekit
 ```
 
@@ -68,14 +68,14 @@ Always activate the virtual environment before running the service manually.
 
 ### 3. Configure the service
 
-Copy the example configuration:
+Create your configuration file from the example:
 
 ```bash
 # Create the config directory
 mkdir -p ~/.config/harvia-homekit/
 
-# Copy the example config
-cp config.json ~/.config/harvia-homekit/
+# Copy the example config as a starting point
+cp config.example.json ~/.config/harvia-homekit/config.json
 ```
 
 Edit the configuration with your Harvia cloud credentials:
@@ -83,6 +83,8 @@ Edit the configuration with your Harvia cloud credentials:
 ```bash
 nano ~/.config/harvia-homekit/config.json
 ```
+
+Your config.json file should look like this:
 
 ```json
 {
@@ -94,6 +96,8 @@ nano ~/.config/harvia-homekit/config.json
   "device_name": "My Sauna"
 }
 ```
+
+**Security Warning**: Never commit your config.json file with real credentials to version control. The example config file is provided as a template only.
 
 **Note**: The `device_id` field is used when the service cannot automatically discover your sauna through the API. See the [Finding Your Device ID](#finding-your-device-id) section below.
 
@@ -177,7 +181,7 @@ sudo chmod +x /opt/harvia-homekit/main.py
 
 # Create config directory if it doesn't exist
 mkdir -p ~/.config/harvia-homekit/
-cp config.json ~/.config/harvia-homekit/ # if you haven't already
+cp config.example.json ~/.config/harvia-homekit/config.json # Use the example config as a template
 
 # Reload systemd and enable the service
 sudo systemctl daemon-reload
@@ -235,6 +239,13 @@ sudo cp com.harvia.homekit.plist /Library/LaunchDaemons/
 
 # Set permissions
 sudo chmod +x /opt/harvia-homekit/main.py
+
+# Create config directory if it doesn't exist and use example config
+mkdir -p ~/.config/harvia-homekit/
+cp config.example.json ~/.config/harvia-homekit/config.json
+
+# Edit the config with your actual credentials (never commit this file to git)
+nano ~/.config/harvia-homekit/config.json
 
 # Load the service
 sudo launchctl load /Library/LaunchDaemons/com.harvia.homekit.plist

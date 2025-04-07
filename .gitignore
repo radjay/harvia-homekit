@@ -111,4 +111,4 @@ testvenv/
 .DS_Store
 
 # Configuration with credentials
-config.json 
+config.json config.json
