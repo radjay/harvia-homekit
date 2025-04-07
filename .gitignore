@@ -85,6 +85,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+testvenv/
 
 # Spyder project settings
 .spyderproject
@@ -110,5 +111,4 @@ venv.bak/
 .DS_Store
 
 # Configuration with credentials
-# Uncomment if you want to avoid committing the config file
-# config.json 
+config.json 

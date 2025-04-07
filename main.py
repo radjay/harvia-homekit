@@ -150,8 +150,7 @@ async def main_async(args):
         driver = AccessoryDriver(
             port=51826,
             persist_file=os.path.join(storage_path, 'harvia.state'),
-            pincode=config.get('pin_code', '031-45-154'),
-            display_name=config.get('service_name', 'Harvia Sauna')
+            pincode=config.get('pin_code', '031-45-154').encode()  # Encode as bytes for HAP-python compatibility
         )
         
         # Set up the bridge with accessories

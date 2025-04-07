@@ -8,38 +8,36 @@ This project provides a standalone Python service that integrates with Apple Hom
 - Control sauna power, temperature, humidity, fan, and lights
 - Door state sensor
 - Real-time updates via websocket connections
-- Runs as a system service
+- Runs as a system service (supports both Linux systemd and macOS launchd)
+
+## Repository Structure
+
+The repository is organized as follows:
+
+- `main.py` - Main entry point for the service
+- `pyhap_harvia/` - Core implementation of the Harvia API and HomeKit integration
+  - `api.py` - API client for Harvia Cloud services
+  - `device.py` - Device state management and websocket communication
+  - `accessories/` - HomeKit accessory implementations
+    - `sauna.py` - Sauna accessory implementation for HomeKit
+- `tests/` - Test scripts for development and debugging
+  - `test_temp.py` - Simple test to set the sauna temperature
+  - `test_websocket.py` - Test for websocket communication
+  - `test_device_discovery.py` - Test for device discovery
+  - Additional test scripts for various functionality
+- Installation scripts:
+  - `install.sh` - Main installation script for system service
 
 ## Requirements
 
 - Python 3.6 or higher
 - Harvia Xenio WiFi sauna with cloud connection
 - Apple HomeKit compatible device (iPhone, iPad, or Mac)
-- Debian/Ubuntu-based system for service installation (optional)
+- macOS or Debian/Ubuntu-based system for service installation
 
-## Quick Setup
+## Installation
 
-For the easiest setup experience, use the quick setup script:
-
-```bash
-# Install git if you don't have it already
-# For Debian/Ubuntu:
-# sudo apt-get install git
-
-# Download and run the setup script
-curl -s https://raw.githubusercontent.com/yourusername/harvia-homekit/main/quick_setup.sh | bash
-```
-
-This interactive script will:
-
-1. Clone the repository
-2. Set up a Python virtual environment
-3. Configure your credentials
-4. Offer to run the service immediately
-
-## Manual Installation
-
-If you prefer to install manually, follow these steps:
+Follow these steps to install the service:
 
 ### 1. Clone the repository
 
@@ -113,9 +111,22 @@ To run with debug logging:
 python main.py --debug
 ```
 
-### 5. Install as a system service (optional)
+### 5. Install as a system service
 
-For a system service, we'll need to modify the installation script to use the virtual environment.
+The simplest way to install as a system service is to use our installation script:
+
+```bash
+sudo ./install.sh
+```
+
+This script automatically detects your operating system and installs the appropriate service:
+
+- On Linux: Creates a systemd service
+- On macOS: Creates a launchd service
+
+#### Manual service installation (Linux)
+
+If you prefer to install the systemd service manually on Linux:
 
 ```bash
 # First, edit the service file to set your username
@@ -172,6 +183,62 @@ cp config.json ~/.config/harvia-homekit/ # if you haven't already
 sudo systemctl daemon-reload
 sudo systemctl enable harvia-homekit
 sudo systemctl start harvia-homekit
+```
+
+#### Manual service installation (macOS)
+
+If you prefer to install the launchd service manually on macOS:
+
+```bash
+# Create a plist file
+cat > com.harvia.homekit.plist << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.harvia.homekit</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/harvia-homekit/venv/bin/python</string>
+        <string>/opt/harvia-homekit/main.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardErrorPath</key>
+    <string>/tmp/harvia-homekit.err</string>
+    <key>StandardOutPath</key>
+    <string>/tmp/harvia-homekit.out</string>
+    <key>UserName</key>
+    <string>YOUR_USERNAME</string>
+    <key>WorkingDirectory</key>
+    <string>/opt/harvia-homekit</string>
+</dict>
+</plist>
+EOF
+
+# Edit the plist file to set your username
+nano com.harvia.homekit.plist
+
+# Create installation directory and copy files
+sudo mkdir -p /opt/harvia-homekit
+sudo cp -r * /opt/harvia-homekit/
+
+# Set up virtual environment
+sudo python3 -m venv /opt/harvia-homekit/venv
+sudo /opt/harvia-homekit/venv/bin/pip install -r /opt/harvia-homekit/requirements.txt
+
+# Copy the plist file to LaunchDaemons
+sudo cp com.harvia.homekit.plist /Library/LaunchDaemons/
+
+# Set permissions
+sudo chmod +x /opt/harvia-homekit/main.py
+
+# Load the service
+sudo launchctl load /Library/LaunchDaemons/com.harvia.homekit.plist
+sudo launchctl start com.harvia.homekit
 ```
 
 ## Finding Your Device ID
