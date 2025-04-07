@@ -1,0 +1,5 @@
+HAP-python>=4.9.2
+boto3>=1.34.69
+pycognito>=2024.2.0
+websockets>=12.0
+aiohttp>=3.9.0 
