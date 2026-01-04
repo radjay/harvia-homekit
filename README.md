@@ -252,6 +252,74 @@ sudo launchctl load /Library/LaunchDaemons/com.harvia.homekit.plist
 sudo launchctl start com.harvia.homekit
 ```
 
+### Alternative Install using Docker
+
+Instead of installing as a system service, here's a quick and dirty docker
+setup, assuming a directory named `.harvia-homekit`:
+
+```bash
+mkdir -p .harvia-homekit
+cd .harvia-homekit/
+git clone https://github.com/radjay/harvia-homekit.git
+
+# make a directory for config
+mkdir -p config/harvia-homekit
+cp harvia-homekit/config.example.json config/harvia-homekit/config.json
+
+# Edit the config with your actual credentials (never commit this file to git)
+nano config/harvia-homekit/config.json
+```
+
+Use this `Dockerfile`:
+
+```Dockerfile
+FROM python:3.12-slim
+
+# Prevents Python from writing pyc files and buffers (nicer logs)
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /harvia-homekit
+
+# Copy requirements first for better build caching
+COPY harvia-homekit/requirements.txt /harvia-homekit/requirements.txt
+RUN pip install --no-cache-dir -r /harvia-homekit/requirements.txt
+
+# Copy the actual app
+COPY harvia-homekit/ /harvia-homekit/
+
+# Run it
+CMD ["python", "main.py"]
+```
+
+And this `docker-compose.yml`:
+
+```yaml
+services:
+  harvia-homekit:
+    build: .
+    container_name: harvia-homekit
+    restart: unless-stopped
+
+    # HomeKit discovery (mDNS/Bonjour) usually wants host networking.
+    network_mode: host
+
+    # Mount the config where the app expects it: ~/.config/harvia-homekit/config.json
+    volumes:
+      - ./config:/root/.config:ro
+
+      # Optional: persist any runtime artifacts/logs/state if the app writes them
+      - ./data:/data
+
+    environment:
+      - TZ=America/New_York
+```
+Run it using `docker compose up -d --build` and check the logs using:
+`docker compose logs -f`
+
+Because of the `restart: unless-stopped` in `docker-compose.yml` Docker is
+our service manager.
+
 ## Finding Your Device ID
 
 If the service fails to automatically discover your sauna, you'll need to manually specify the device ID in your configuration file. Here are several ways to find your device ID:
