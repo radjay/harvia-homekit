@@ -172,8 +172,7 @@ async def main_async(args):
         keep_alive_task = asyncio.create_task(keep_alive())
         
         # Start the driver (this will block until driver.stop() is called)
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, driver.start)
+        await asyncio.get_running_loop().run_in_executor(None, driver.start)
         
         # Clean up
         keep_alive_task.cancel()
@@ -206,8 +205,7 @@ def main():
         logging.getLogger('pyhap').setLevel(logging.INFO)
     
     try:
-        loop = asyncio.get_event_loop()
-        exit_code = loop.run_until_complete(main_async(args))
+        exit_code = asyncio.run(main_async(args))
         sys.exit(exit_code)
     except KeyboardInterrupt:
         logger.info("Service interrupted by user")

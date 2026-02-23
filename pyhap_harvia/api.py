@@ -100,8 +100,7 @@ class HarviaSaunaAPI:
         logger.debug(f"Using username: {self.username} with password: {self.password}")
 
         try:
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
+            await asyncio.get_running_loop().run_in_executor(
                 None, lambda: u.authenticate(password=self.password)
             )
         except botocore.exceptions.ClientError as e:
@@ -129,8 +128,7 @@ class HarviaSaunaAPI:
             id_token = endpoints["users"]["identityPoolId"]
 
             username = self.username
-            loop = asyncio.get_event_loop()
-            u = await loop.run_in_executor(
+            u = await asyncio.get_running_loop().run_in_executor(
                 None, 
                 lambda: Cognito(
                     user_pool_id, 
@@ -154,8 +152,7 @@ class HarviaSaunaAPI:
         """Check and renew tokens if needed"""
         client = await self.getAuthenticatedClient()
         current_id_token = self.token_data['id_token']
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
+        await asyncio.get_running_loop().run_in_executor(
             None, lambda: client.check_token(renew=True)
         )
         self.token_data = {
