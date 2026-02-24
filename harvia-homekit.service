@@ -7,11 +7,11 @@ Wants=network-online.target
 Type=simple
 User=YOUR_USERNAME
 WorkingDirectory=/opt/harvia-homekit
-ExecStart=/opt/harvia-homekit/venv/bin/python /opt/harvia-homekit/main.py
+ExecStart=/opt/harvia-homekit/venv/bin/harvia-sauna service
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=multi-user.target 
+WantedBy=multi-user.target

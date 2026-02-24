@@ -1,90 +1,62 @@
 # Harvia Sauna HomeKit Integration
 
-This project provides a standalone Python service that integrates with Apple HomeKit to control your Harvia Xenio WiFi sauna without needing Home Assistant.
+Control your Harvia Xenio WiFi sauna from the command line or through Apple HomeKit — no Home Assistant required.
 
 ## Features
 
-- Direct integration with Apple HomeKit
-- Control sauna power, temperature, humidity, fan, and lights
-- Door state sensor
-- Real-time updates via websocket connections
-- Runs as a system service (supports both Linux systemd and macOS launchd)
+- **CLI** — `harvia-sauna start/stop/status/temp` for quick control from any terminal
+- **HomeKit bridge** — thermostat accessory with real-time temperature updates via WebSocket
+- **Runs as a system service** — supports both macOS launchd and Linux systemd
 
-## Repository Structure
+## Quick Start
 
-The repository is organized as follows:
+```bash
+# Install in a virtualenv
+python3 -m venv venv && source venv/bin/activate
+pip install .
 
-- `main.py` - Main entry point for the service
-- `pyhap_harvia/` - Core implementation of the Harvia API and HomeKit integration
-  - `api.py` - API client for Harvia Cloud services
-  - `device.py` - Device state management and websocket communication
-  - `accessories/` - HomeKit accessory implementations
-    - `sauna.py` - Sauna accessory implementation for HomeKit
-- `tests/` - Test scripts for development and debugging
-  - `test_temp.py` - Simple test to set the sauna temperature
-  - `test_websocket.py` - Test for websocket communication
-  - `test_device_discovery.py` - Test for device discovery
-  - Additional test scripts for various functionality
-- Installation scripts:
-  - `install.sh` - Main installation script for system service
+# Set up your config
+mkdir -p ~/.config/harvia-homekit
+cp config.example.json ~/.config/harvia-homekit/config.json
+nano ~/.config/harvia-homekit/config.json   # add your credentials
+
+# Use the CLI
+harvia-sauna status          # show current state
+harvia-sauna start           # turn sauna ON
+harvia-sauna stop            # turn sauna OFF
+harvia-sauna temp 80         # set temperature to 80°C
+harvia-sauna service         # run the HomeKit bridge
+```
 
 ## Requirements
 
-- Python 3.6 or higher
+- Python 3.9+ (tested up to 3.14)
 - Harvia Xenio WiFi sauna with cloud connection
 - Apple HomeKit compatible device (iPhone, iPad, or Mac)
-- macOS or Debian/Ubuntu-based system for service installation
+- For remote control: an Apple Home Hub (Apple TV, HomePod, or iPad) on the same network
 
 ## Installation
 
-Follow these steps to install the service:
-
-### 1. Clone the repository
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/radjay/harvia-homekit.git
 cd harvia-homekit
-```
-
-### 2. Set up a Python virtual environment
-
-It's recommended to use a virtual environment to avoid conflicts with system packages:
-
-```bash
-# Create a virtual environment
 python3 -m venv venv
-
-# Activate the virtual environment
-# On macOS/Linux:
 source venv/bin/activate
-# On Windows:
-# venv\Scripts\activate
-
-# Now install the dependencies
-pip install -r requirements.txt
+pip install .
 ```
 
-Always activate the virtual environment before running the service manually.
-
-### 3. Configure the service
+### 2. Configure
 
 Create your configuration file from the example:
 
 ```bash
-# Create the config directory
 mkdir -p ~/.config/harvia-homekit/
-
-# Copy the example config as a starting point
 cp config.example.json ~/.config/harvia-homekit/config.json
 ```
 
-Edit the configuration with your Harvia cloud credentials:
-
-```bash
-nano ~/.config/harvia-homekit/config.json
-```
-
-Your config.json file should look like this:
+Edit with your Harvia cloud credentials:
 
 ```json
 {
@@ -97,271 +69,144 @@ Your config.json file should look like this:
 }
 ```
 
-**Security Warning**: Never commit your config.json file with real credentials to version control. The example config file is provided as a template only.
+**Note**: The `device_id` field is used when the service cannot automatically discover your sauna through the API. See [Finding Your Device ID](#finding-your-device-id) below.
 
-**Note**: The `device_id` field is used when the service cannot automatically discover your sauna through the API. See the [Finding Your Device ID](#finding-your-device-id) section below.
+### 3. CLI Usage
 
-### 4. Run the service manually
-
-Ensure your virtual environment is activated, then run:
+All one-shot commands connect to the Harvia Cloud API, perform the operation, and disconnect (~2-3 seconds):
 
 ```bash
-python main.py
+harvia-sauna status                    # print power, temperature, humidity
+harvia-sauna start                     # turn the sauna ON
+harvia-sauna stop                      # turn the sauna OFF
+harvia-sauna temp 80                   # set target temperature to 80°C
+harvia-sauna status --debug            # verbose output
+harvia-sauna status --config /path/to/config.json
 ```
 
-To run with debug logging:
+### 4. Run the HomeKit bridge
 
 ```bash
-python main.py --debug
+harvia-sauna service                   # foreground
+harvia-sauna service --debug           # with debug logging
 ```
 
 ### 5. Install as a system service
 
-The simplest way to install as a system service is to use our installation script:
-
 ```bash
+deactivate  # if you're in a venv
 sudo ./install.sh
 ```
 
-This script automatically detects your operating system and installs the appropriate service:
+This installs the package into `/opt/harvia-homekit/venv` via `pip install` and sets up a launchd (macOS) or systemd (Linux) service that runs `harvia-sauna service`.
 
-- On Linux: Creates a systemd service
-- On macOS: Creates a launchd service
-
-#### Manual service installation (Linux)
-
-If you prefer to install the systemd service manually on Linux:
+If `install.sh` fails to create the venv (common with macOS system Python), create it manually first:
 
 ```bash
-# First, edit the service file to set your username
-nano harvia-homekit.service
+brew install python3
+sudo rm -rf /opt/harvia-homekit/venv
+sudo /opt/homebrew/bin/python3 -m venv /opt/harvia-homekit/venv
+sudo ./install.sh
 ```
 
-Modify the service file to use the virtual environment:
+**Important**: Make sure to deactivate any virtual environment before running `install.sh`.
 
-```ini
-[Unit]
-Description=Harvia Sauna HomeKit Service
-After=network-online.target
-Wants=network-online.target
+## Repository Structure
 
-[Service]
-Type=simple
-User=YOUR_USERNAME
-WorkingDirectory=/opt/harvia-homekit
-# Update this line to use the virtual environment
-ExecStart=/opt/harvia-homekit/venv/bin/python /opt/harvia-homekit/main.py
-Restart=on-failure
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
 ```
-
-Then install the service:
-
-```bash
-# Create installation directory
-sudo mkdir -p /opt/harvia-homekit
-
-# Copy files
-sudo cp -r * /opt/harvia-homekit/
-
-# Set up virtual environment in the installation directory
-sudo python3 -m venv /opt/harvia-homekit/venv
-sudo /opt/harvia-homekit/venv/bin/pip install -r /opt/harvia-homekit/requirements.txt
-
-# Copy service file (after editing it with your username)
-sudo cp /opt/harvia-homekit/harvia-homekit.service /etc/systemd/system/
-
-# Set permissions
-sudo chmod +x /opt/harvia-homekit/main.py
-
-# Create config directory if it doesn't exist
-mkdir -p ~/.config/harvia-homekit/
-cp config.example.json ~/.config/harvia-homekit/config.json # Use the example config as a template
-
-# Reload systemd and enable the service
-sudo systemctl daemon-reload
-sudo systemctl enable harvia-homekit
-sudo systemctl start harvia-homekit
-```
-
-#### Manual service installation (macOS)
-
-If you prefer to install the launchd service manually on macOS:
-
-```bash
-# Create a plist file
-cat > com.harvia.homekit.plist << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.harvia.homekit</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/opt/harvia-homekit/venv/bin/python</string>
-        <string>/opt/harvia-homekit/main.py</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardErrorPath</key>
-    <string>/tmp/harvia-homekit.err</string>
-    <key>StandardOutPath</key>
-    <string>/tmp/harvia-homekit.out</string>
-    <key>UserName</key>
-    <string>YOUR_USERNAME</string>
-    <key>WorkingDirectory</key>
-    <string>/opt/harvia-homekit</string>
-</dict>
-</plist>
-EOF
-
-# Edit the plist file to set your username
-nano com.harvia.homekit.plist
-
-# Create installation directory and copy files
-sudo mkdir -p /opt/harvia-homekit
-sudo cp -r * /opt/harvia-homekit/
-
-# Set up virtual environment
-sudo python3 -m venv /opt/harvia-homekit/venv
-sudo /opt/harvia-homekit/venv/bin/pip install -r /opt/harvia-homekit/requirements.txt
-
-# Copy the plist file to LaunchDaemons
-sudo cp com.harvia.homekit.plist /Library/LaunchDaemons/
-
-# Set permissions
-sudo chmod +x /opt/harvia-homekit/main.py
-
-# Create config directory if it doesn't exist and use example config
-mkdir -p ~/.config/harvia-homekit/
-cp config.example.json ~/.config/harvia-homekit/config.json
-
-# Edit the config with your actual credentials (never commit this file to git)
-nano ~/.config/harvia-homekit/config.json
-
-# Load the service
-sudo launchctl load /Library/LaunchDaemons/com.harvia.homekit.plist
-sudo launchctl start com.harvia.homekit
+src/harvia_sauna/
+├── __init__.py            # Package version
+├── cli.py                 # CLI entry point (harvia-sauna command)
+├── config.py              # Configuration loading
+├── logging_setup.py       # Centralised logging setup
+├── api.py                 # Harvia Cloud API client
+├── device.py              # Device state + WebSocket communication
+├── service.py             # HomeKit bridge service logic
+└── accessories/
+    └── sauna.py           # HomeKit thermostat accessory
 ```
 
 ## Finding Your Device ID
 
-If the service fails to automatically discover your sauna, you'll need to manually specify the device ID in your configuration file. Here are several ways to find your device ID:
+If the service fails to automatically discover your sauna, you'll need to manually specify the device ID in your configuration file.
 
-### Method 1: Using the Harvia mobile app
+**Important**: The device ID is a UUID (e.g. `e9d119f8-76f6-4c6e-831f-231238570790`), not the serial number printed on your sauna.
 
-1. Install and login to the official Harvia mobile app
-2. Navigate to your sauna in the app
-3. Look for device information in the settings or about section
-4. The device ID may be displayed as a serial number or device identifier
+### Method 1: Using debug mode (recommended)
 
-### Method 2: Using the debug mode
+```bash
+harvia-sauna status --debug
+```
 
-The debug mode can help you see what's happening with the API:
+Check the output or WebSocket log for the device ID:
 
-1. Ensure your virtual environment is activated
-2. Run the service with debug logging enabled:
-   ```bash
-   python main.py --debug
-   ```
-3. Look for errors or device discovery attempts in the logs
-4. Check if any partial device information is displayed
+```bash
+tail -f /tmp/harvia-homekit/websocket.log | grep deviceId
+```
 
-### Method 3: Using Network Inspection
+### Method 2: Using network inspection
 
-If you have access to a network monitoring tool or can capture the traffic from the official Harvia app:
+Use Wireshark or a proxy like Charles to inspect GraphQL requests from the official Harvia app.
 
-1. Use a tool like Wireshark or a proxy like Charles to inspect the network traffic
-2. Look for GraphQL requests to the Harvia cloud API
-3. Find requests containing device information and extract the device ID
-
-Once you have found your device ID, add it to your config.json file:
+Once you have your device ID, add it to `config.json`:
 
 ```json
 {
-  "username": "your_harvia_username",
-  "password": "your_harvia_password",
-  "pin_code": "031-45-154",
-  "service_name": "Harvia Sauna",
-  "device_id": "your-device-id-here",
-  "device_name": "My Sauna"
+  "device_id": "e9d119f8-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 }
 ```
 
 ## Adding to Apple Home
 
 1. Open the Home app on your iOS device
-2. Tap the "+" button to add an accessory
-3. Tap "Add Accessory"
-4. Tap "I Don't Have a Code or Cannot Scan"
-5. Look for "Harvia Sauna Bridge" under "Nearby Accessories"
-6. Enter the PIN code from your config (default: 031-45-154)
-7. Follow the prompts to complete the setup
+2. Tap "+" > "Add Accessory"
+3. Tap "More options..." or "I Don't Have a Code or Cannot Scan"
+4. Look for "Harvia Sauna Bridge" under "Nearby Accessories"
+5. Enter the PIN code from your config (default: `031-45-154`)
 
-## Controlling the Sauna
-
-After adding to Apple Home, you'll see the following accessories:
-
-- **Thermostat**: Control power and temperature
-- **Light**: Control the sauna lights
-- **Fan**: Control the ventilation fan
-- **Steamer**: Control the steam generator (if available)
-- **Door Sensor**: Shows if the sauna door is open/closed
+**Your iPhone must be on the same network as the machine running the service.**
 
 ## Troubleshooting
 
-### Common Issues
+### Accessory Not Found in Home App
 
-#### Cannot Find Devices
+1. Check the service is running and port 51826 is listening:
+   ```bash
+   # macOS
+   sudo launchctl list | grep harvia
+   lsof -i :51826
 
-If you see an error like `No sauna devices found` or `Field 'listDevices' in type 'Query' is undefined`:
+   # Linux
+   sudo systemctl status harvia-homekit
+   ```
+2. Verify mDNS is broadcasting:
+   ```bash
+   dns-sd -B _hap._tcp  # should show "Harvia Sauna Bridge"
+   ```
+3. **macOS firewall**: Allow the Python binary through
+4. **VPN/Tailscale**: Enable "Allow local network access" for mDNS discovery
 
-1. The Harvia API structure has changed or your account doesn't have the correct permissions
-2. Add your device ID manually to the configuration file (see [Finding Your Device ID](#finding-your-device-id))
-3. Check your internet connection and firewall settings
+### Temperature Not Updating
 
-#### Authentication Failures
-
-If you see errors about authentication:
-
-1. Verify your username and password are correct
-2. Ensure you're using the same credentials as the official Harvia app
-3. Check if your account has been locked due to too many failed attempts
-
-#### Connection Issues
-
-If the service starts but doesn't respond to commands:
-
-1. Make sure your sauna is connected to your home Wi-Fi
-2. Verify the sauna is registered to your Harvia account
-3. Check if the sauna can be controlled via the official Harvia app
+1. Check that `device_id` is the **API UUID**, not the serial number
+2. Check WebSocket logs for "ignoring update for different device":
+   ```bash
+   grep "ignoring" /tmp/harvia-homekit/websocket.log
+   ```
 
 ### Checking Logs
 
-For service logs:
-
 ```bash
+# macOS (launchd)
+sudo launchctl list | grep harvia
+cat /tmp/harvia-homekit.out
+cat /tmp/harvia-homekit.err
+tail -f /tmp/harvia-homekit/api.log
+tail -f /tmp/harvia-homekit/websocket.log
+
+# Linux (systemd)
 sudo systemctl status harvia-homekit
 sudo journalctl -u harvia-homekit -f
-```
-
-For detailed logging, run with the debug flag:
-
-```bash
-# If running manually with virtual environment:
-python main.py --debug
-
-# If running as a service:
-sudo systemctl stop harvia-homekit
-sudo -u YOUR_USERNAME /opt/harvia-homekit/venv/bin/python /opt/harvia-homekit/main.py --debug
 ```
 
 ## License

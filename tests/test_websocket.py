@@ -4,7 +4,7 @@ import websockets
 import json
 import base64
 import logging
-from pyhap_harvia.api import HarviaSaunaAPI
+from harvia_sauna.api import HarviaSaunaAPI
 from urllib.parse import quote
 import uuid
 

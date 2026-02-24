@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 
-from pyhap_harvia.api import HarviaSaunaAPI
+from harvia_sauna.api import HarviaSaunaAPI
 
 # Configure logging
 logging.basicConfig(

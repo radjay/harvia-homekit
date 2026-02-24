@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
-from pyhap_harvia.api import HarviaSaunaAPI
+from harvia_sauna.api import HarviaSaunaAPI
 import json
 import logging
 

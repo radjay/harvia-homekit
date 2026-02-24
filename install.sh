@@ -35,28 +35,26 @@ fi
 mkdir -p ${INSTALL_PATH}
 mkdir -p ${CONFIG_PATH}
 
-# Copy files
+# Copy project files (source, pyproject, config example)
 echo "Copying files to ${INSTALL_PATH}..."
-cp -r ./* ${INSTALL_PATH}/
+cp -r ./src ${INSTALL_PATH}/
+cp ./pyproject.toml ${INSTALL_PATH}/
+cp ./config.example.json ${INSTALL_PATH}/
 
 # Check for existing user configuration
 if [ -f "${CONFIG_PATH}/config.json" ]; then
   echo "Found existing configuration, will use it for the service."
 else
   echo "Creating default config file..."
-  cp ${INSTALL_PATH}/config.json ${CONFIG_PATH}/
+  cp ${INSTALL_PATH}/config.example.json ${CONFIG_PATH}/config.json
   echo "Please edit ${CONFIG_PATH}/config.json with your credentials."
 fi
 
-# Always copy the latest user configuration to the service directory
-echo "Updating service configuration..."
-cp ${CONFIG_PATH}/config.json ${INSTALL_PATH}/config.json
-
-# Set up virtual environment
+# Set up virtual environment and install the package
 echo "Setting up Python virtual environment..."
 python3 -m venv ${INSTALL_PATH}/venv
 ${INSTALL_PATH}/venv/bin/pip install --upgrade pip
-${INSTALL_PATH}/venv/bin/pip install -r ${INSTALL_PATH}/requirements.txt
+${INSTALL_PATH}/venv/bin/pip install ${INSTALL_PATH}
 
 if [ "$IS_MACOS" = true ]; then
   # Create launchd plist file for macOS
@@ -70,8 +68,8 @@ if [ "$IS_MACOS" = true ]; then
     <string>com.harvia.homekit</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${INSTALL_PATH}/venv/bin/python</string>
-        <string>${INSTALL_PATH}/main.py</string>
+        <string>${INSTALL_PATH}/venv/bin/harvia-sauna</string>
+        <string>service</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -92,11 +90,11 @@ EOF
   # Install launchd service
   echo "Installing launchd service..."
   cp ${INSTALL_PATH}/com.harvia.homekit.plist ${LAUNCHD_PATH}/
-  
+
   # Stop the service if it's running
   echo "Stopping any existing service..."
   launchctl unload ${LAUNCHD_PATH}/com.harvia.homekit.plist 2>/dev/null || true
-  
+
   # Load the service
   echo "Loading and starting service..."
   launchctl load ${LAUNCHD_PATH}/com.harvia.homekit.plist || {
@@ -106,10 +104,9 @@ EOF
     }
   }
 else
-  # Update systemd service file with correct username and paths
+  # Update systemd service file with correct username
   echo "Configuring systemd service file with user: ${CURRENT_USER}"
   sed -i "s/YOUR_USERNAME/${CURRENT_USER}/g" ${INSTALL_PATH}/harvia-homekit.service
-  sed -i "s|ExecStart=/usr/bin/python3 /opt/harvia-homekit/main.py|ExecStart=${INSTALL_PATH}/venv/bin/python ${INSTALL_PATH}/main.py|g" ${INSTALL_PATH}/harvia-homekit.service
 
   # Copy service file
   echo "Installing systemd service..."
@@ -126,10 +123,19 @@ fi
 echo "Setting permissions..."
 chown -R ${CURRENT_USER}:${USER_GROUP} ${CONFIG_PATH}
 chmod -R 750 ${CONFIG_PATH}
-chmod +x ${INSTALL_PATH}/main.py
 
 echo ""
 echo "Installation complete!"
+echo ""
+echo "The 'harvia-sauna' CLI is available at: ${INSTALL_PATH}/venv/bin/harvia-sauna"
+echo ""
+echo "CLI commands:"
+echo "  harvia-sauna status       # Show current sauna state"
+echo "  harvia-sauna start        # Turn the sauna ON"
+echo "  harvia-sauna stop         # Turn the sauna OFF"
+echo "  harvia-sauna temp 80      # Set temperature to 80°C"
+echo "  harvia-sauna service      # Run the HomeKit bridge (managed by launchd/systemd)"
+echo ""
 if [ "$IS_MACOS" = true ]; then
   echo "Service has been installed with launchd."
   echo ""
@@ -139,6 +145,8 @@ if [ "$IS_MACOS" = true ]; then
   echo "To view logs:"
   echo "  cat /tmp/harvia-homekit.out"
   echo "  cat /tmp/harvia-homekit.err"
+  echo "  tail -f /tmp/harvia-homekit/api.log"
+  echo "  tail -f /tmp/harvia-homekit/websocket.log"
   echo ""
   echo "To stop the service:"
   echo "  sudo launchctl unload ${LAUNCHD_PATH}/com.harvia.homekit.plist"
@@ -157,4 +165,4 @@ echo ""
 echo "Don't forget to edit your configuration if needed:"
 echo "  nano ${CONFIG_PATH}/config.json"
 echo ""
-echo "After editing the configuration, restart the service to apply changes." 
+echo "After editing the configuration, restart the service to apply changes."
