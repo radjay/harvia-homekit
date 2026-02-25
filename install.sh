@@ -87,21 +87,57 @@ if [ "$IS_MACOS" = true ]; then
 </plist>
 EOF
 
-  # Install launchd service
-  echo "Installing launchd service..."
+  # Create a daily restart plist (kills at 2am; KeepAlive restarts it immediately)
+  echo "Creating daily restart launchd job..."
+  cat > ${INSTALL_PATH}/com.harvia.homekit.restart.plist << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.harvia.homekit.restart</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/launchctl</string>
+        <string>kickstart</string>
+        <string>-k</string>
+        <string>system/com.harvia.homekit</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardErrorPath</key>
+    <string>/tmp/harvia-homekit-restart.err</string>
+    <key>StandardOutPath</key>
+    <string>/tmp/harvia-homekit-restart.out</string>
+</dict>
+</plist>
+EOF
+
+  # Install launchd services
+  echo "Installing launchd services..."
   cp ${INSTALL_PATH}/com.harvia.homekit.plist ${LAUNCHD_PATH}/
+  cp ${INSTALL_PATH}/com.harvia.homekit.restart.plist ${LAUNCHD_PATH}/
 
-  # Stop the service if it's running
-  echo "Stopping any existing service..."
+  # Stop services if running
+  echo "Stopping any existing services..."
   launchctl unload ${LAUNCHD_PATH}/com.harvia.homekit.plist 2>/dev/null || true
+  launchctl unload ${LAUNCHD_PATH}/com.harvia.homekit.restart.plist 2>/dev/null || true
 
-  # Load the service
-  echo "Loading and starting service..."
+  # Load services
+  echo "Loading and starting services..."
   launchctl load ${LAUNCHD_PATH}/com.harvia.homekit.plist || {
     echo "Warning: Failed to load service. Will try alternative method..."
     launchctl bootstrap system ${LAUNCHD_PATH}/com.harvia.homekit.plist || {
       echo "Error: Could not start service. You may need to restart your system."
     }
+  }
+  launchctl load ${LAUNCHD_PATH}/com.harvia.homekit.restart.plist || {
+    echo "Warning: Failed to load restart job."
   }
 else
   # Update systemd service file with correct username
@@ -153,6 +189,10 @@ if [ "$IS_MACOS" = true ]; then
   echo ""
   echo "To start the service:"
   echo "  sudo launchctl load ${LAUNCHD_PATH}/com.harvia.homekit.plist"
+  echo ""
+  echo "The service will automatically restart every day at 2:00 AM."
+  echo "To disable the daily restart:"
+  echo "  sudo launchctl unload ${LAUNCHD_PATH}/com.harvia.homekit.restart.plist"
 else
   echo "Service status:"
   systemctl status harvia-homekit
@@ -161,6 +201,14 @@ else
   echo "  journalctl -u harvia-homekit -f"
 fi
 
+echo ""
+echo "To use 'harvia-sauna' from anywhere, add the following to your shell config:"
+echo ""
+echo "  # For zsh (~/.zshrc):"
+echo "  echo 'export PATH=\"/opt/harvia-homekit/venv/bin:\$PATH\"' >> ~/.zshrc && source ~/.zshrc"
+echo ""
+echo "  # For bash (~/.bashrc):"
+echo "  echo 'export PATH=\"/opt/harvia-homekit/venv/bin:\$PATH\"' >> ~/.bashrc && source ~/.bashrc"
 echo ""
 echo "Don't forget to edit your configuration if needed:"
 echo "  nano ${CONFIG_PATH}/config.json"
